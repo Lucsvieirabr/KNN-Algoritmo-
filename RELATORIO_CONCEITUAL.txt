@@ -1,0 +1,348 @@
+================================================================================
+              RELATORIO CONCEITUAL - ALGORITMO K-NEAREST NEIGHBORS (KNN)
+                    Trabalho Academico de Machine Learning
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECAO 1 - INTRODUCAO E CATEGORIZACAO
+--------------------------------------------------------------------------------
+
+1.1. DEFINICAO DO ALGORITMO
+
+O K-Nearest Neighbors (KNN), ou "K-Vizinhos Mais Proximos", e um dos
+algoritmos mais fundamentais e intuitivos da area de Machine Learning.
+Sua premissa central baseia-se em uma ideia simples e poderosa, muitas
+vezes resumida pela expressao: "Diga-me com quem andas e te direi quem es".
+
+Formalmente, o KNN classifica (ou preve o valor de) uma nova amostra de
+dados analisando os 'K' exemplos mais proximos a ela dentro do conjunto
+de treinamento. A "proximidade" e definida por uma metrica de distancia
+matematica em um espaco de N dimensoes (onde N e o numero de atributos
+ou features do dataset).
+
+
+1.2. CATEGORIZACAO: APRENDIZADO SUPERVISIONADO
+
+O KNN e classificado como um algoritmo de APRENDIZADO SUPERVISIONADO
+(Supervised Learning). Essa categorizacao decorre do fato de que ele
+exige um conjunto de dados previamente rotulado (labeled data) para
+operar. Ou seja, cada exemplo do conjunto de treinamento possui um par
+composto por:
+   - Um vetor de atributos de entrada (X);
+   - Um rotulo/valor de saida desejado (y).
+
+O algoritmo utiliza esses rotulos conhecidos para inferir a saida de
+novos dados nao vistos. Ele atua em duas modalidades:
+
+   a) CLASSIFICACAO: Quando a variavel de saida e categorica/discreta
+      (ex.: definir se uma flor e da especie Setosa, Versicolor ou
+      Virginica). A resposta e obtida por VOTACAO MAJORITARIA entre os
+      vizinhos.
+
+   b) REGRESSAO: Quando a variavel de saida e continua/numerica (ex.:
+      prever o preco de um imovel). A resposta e obtida pela MEDIA (ou
+      media ponderada) dos valores dos vizinhos.
+
+
+1.3. CARACTERIZACAO COMO "INSTANCE-BASED" (LAZY LEARNER)
+
+O KNN pertence a familia dos algoritmos baseados em instancias
+(Instance-based Learning), sendo tambem popularmente chamado de
+"Aprendiz Preguicoso" (Lazy Learner). Essa denominacao possui uma
+justificativa tecnica precisa:
+
+   - AUSENCIA DE FASE DE TREINAMENTO EXPLICITA: Diferentemente de
+     algoritmos "gulosos" (Eager Learners), como Redes Neurais ou
+     Arvores de Decisao, o KNN NAO constroi um modelo generalizado
+     (uma funcao matematica) durante a fase de treinamento. Ele
+     simplesmente ARMAZENA todo o conjunto de dados de treinamento na
+     memoria.
+
+   - COMPUTACAO ADIADA (NA PREDICAO): Todo o esforco computacional e
+     "adiado" (deferred) para o momento da predicao (query time). Quando
+     uma nova amostra precisa ser classificada, so entao o algoritmo
+     percorre toda a base armazenada, calcula as distancias e determina
+     os vizinhos.
+
+Consequencia pratica: O treinamento e extremamente rapido (custo O(1)),
+mas a predicao e computacionalmente cara (custo tipicamente O(n*d),
+onde n e o numero de amostras e d o numero de dimensoes), pois exige o
+calculo de distancia para todos os pontos armazenados.
+
+
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECAO 2 - FUNDAMENTACAO MATEMATICA E FLUXO PASSO A PASSO
+--------------------------------------------------------------------------------
+
+2.1. O CALCULO DE DISTANCIA (O CORACAO DO ALGORITMO)
+
+A essencia matematica do KNN reside em quantificar o quao "similares"
+ou "proximos" dois pontos de dados sao. Para isso, utilizam-se metricas
+de distancia. Sejam dois pontos p e q em um espaco n-dimensional:
+
+   p = (p1, p2, p3, ..., pn)
+   q = (q1, q2, q3, ..., qn)
+
+
+   (A) DISTANCIA EUCLIDIANA (a mais utilizada)
+
+   E a distancia "em linha reta" entre dois pontos, derivada do Teorema
+   de Pitagoras generalizado. E a metrica padrao (default) da maioria
+   das implementacoes.
+
+   Formula formal:
+
+               ___________________________
+              /   n
+     d(p,q) = / SUM  ( q_i  -  p_i )^2
+            \/  i=1
+
+   Representacao linear equivalente:
+
+     d(p,q) = SQRT[ (q1-p1)^2 + (q2-p2)^2 + ... + (qn-pn)^2 ]
+
+
+   (B) DISTANCIA DE MANHATTAN (City Block / L1)
+
+   Mede a distancia percorrida ao longo dos eixos em angulos retos
+   (como quarteiroes de uma cidade). E menos sensivel a outliers que
+   a Euclidiana.
+
+   Formula formal:
+
+               n
+     d(p,q) = SUM  | q_i  -  p_i |
+              i=1
+
+   Representacao linear equivalente:
+
+     d(p,q) = |q1-p1| + |q2-p2| + ... + |qn-pn|
+
+
+   (C) DISTANCIA DE MINKOWSKI (Generalizacao)
+
+   Ambas as metricas acima sao casos particulares da Distancia de
+   Minkowski, controlada por um parametro 'r':
+
+                  n                    (1/r)
+     d(p,q) = ( SUM | q_i - p_i |^r )
+                 i=1
+
+   Onde:
+     - Se r = 1  ->  obtem-se a Distancia de Manhattan.
+     - Se r = 2  ->  obtem-se a Distancia Euclidiana.
+
+
+2.2. O HIPERPARAMETRO 'K' E A VOTACAO MAJORITARIA
+
+O 'K' e o hiperparametro mais importante do algoritmo. Ele define
+QUANTOS vizinhos mais proximos serao consultados para tomar a decisao.
+
+   IMPACTO DA ESCOLHA DO K:
+
+   - K MUITO PEQUENO (ex.: K=1): O modelo torna-se muito sensivel a
+     ruidos e outliers. A fronteira de decisao fica irregular, gerando
+     OVERFITTING (alta variancia). A decisao depende de um unico ponto,
+     que pode ser um erro na base.
+
+   - K MUITO GRANDE (ex.: K = numero total de amostras): O modelo tende
+     a sempre prever a classe majoritaria de todo o dataset, ignorando
+     a estrutura local dos dados. Isso gera UNDERFITTING (alto vies).
+
+   - REGRA PRATICA: E comum escolher um valor de K impar (para evitar
+     empates em problemas de classificacao binaria) e proximo da raiz
+     quadrada do numero de amostras (K ~ sqrt(n)). O valor ideal e
+     geralmente definido empiricamente via validacao cruzada.
+
+
+   VOTACAO MAJORITARIA (Majority Voting):
+
+   Apos identificar o conjunto dos K vizinhos mais proximos (chamado de
+   vizinhanca N), a classe da nova amostra 'x' e definida pela funcao:
+
+                         K
+     y_pred = argmax  ( SUM  I( c == y_i ) )
+                 c      i=1
+
+   Onde:
+     - argmax_c  = retorna a classe 'c' que maximiza a contagem;
+     - I(...)    = funcao indicadora (retorna 1 se verdadeiro, 0 se falso);
+     - y_i       = a classe de cada um dos K vizinhos.
+
+   Em termos simples: conta-se quantos vizinhos pertencem a cada classe,
+   e a classe com o maior numero de votos "vence" e e atribuida a nova
+   amostra.
+
+   VARIACAO (Votacao Ponderada por Distancia): Uma melhoria comum e dar
+   pesos aos votos, onde vizinhos mais proximos tem peso maior. O peso
+   costuma ser o inverso da distancia (w = 1 / d^2).
+
+
+2.3. FLUXO DE EXECUCAO EM PSEUDOCODIGO
+
+O funcionamento completo do KNN para classificar uma nova amostra pode
+ser descrito pelo seguinte pseudocodigo:
+
+--------------------------------------------------------------------
+ENTRADA:
+   D          = conjunto de treinamento {(x1,y1), ..., (xm,ym)}
+   x_novo     = amostra a ser classificada
+   K          = numero de vizinhos
+   dist()     = funcao de distancia (ex.: Euclidiana)
+
+INICIO
+
+   1. PARA cada exemplo (x_i, y_i) em D FACA:
+          calcular distancia = dist(x_novo, x_i)
+          armazenar (distancia, y_i) em uma lista L
+      FIM PARA
+
+   2. ORDENAR a lista L em ordem crescente de distancia.
+
+   3. SELECIONAR os K primeiros elementos de L
+      (os K vizinhos mais proximos) -> vizinhanca N.
+
+   4. SE (tarefa == CLASSIFICACAO) ENTAO:
+          y_pred = classe mais frequente (voto majoritario) em N
+      SENAO SE (tarefa == REGRESSAO) ENTAO:
+          y_pred = media dos valores y dos vizinhos em N
+      FIM SE
+
+   5. RETORNAR y_pred
+
+FIM
+--------------------------------------------------------------------
+
+
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECAO 3 - MODELAGEM DOS DADOS E CENARIO PRATICO
+--------------------------------------------------------------------------------
+
+3.1. DESCRICAO DO DATASET: IRIS (FISHER, 1936)
+
+Para a demonstracao pratica, foi escolhido o classico "Iris Dataset",
+introduzido pelo estatistico e biologo Ronald A. Fisher em 1936. E o
+conjunto de dados de referencia (benchmark) mais utilizado no ensino de
+classificacao, sendo ideal para o KNN por ser numerico, balanceado e
+linearmente/quase-linearmente separavel.
+
+   CARACTERISTICAS DO DATASET:
+   - Total de amostras: 150 flores.
+   - Classes (variavel alvo y): 3 especies, 50 amostras cada.
+        * Iris Setosa
+        * Iris Versicolor
+        * Iris Virginica
+   - Atributos (features X): 4 medidas em centimetros.
+        * Comprimento da Sepala (sepal length)
+        * Largura da Sepala   (sepal width)
+        * Comprimento da Petala (petal length)
+        * Largura da Petala   (petal width)
+
+   Por possuir 4 atributos, cada flor e representada como um ponto em um
+   espaco de 4 dimensoes, sobre o qual as distancias serao calculadas.
+
+
+3.2. PRE-PROCESSAMENTO OBRIGATORIO: NORMALIZACAO DE ESCALA
+
+A etapa de normalizacao (Feature Scaling) e OBRIGATORIA e CRITICA para
+o bom funcionamento do KNN. Isso ocorre por um motivo puramente
+matematico ligado a metrica de distancia.
+
+   O PROBLEMA (JUSTIFICATIVA MATEMATICA):
+
+   Como visto na Secao 2, a Distancia Euclidiana eleva ao quadrado a
+   diferenca entre os atributos. Se um atributo possui uma escala
+   numerica muito maior que os outros, ele DOMINARA totalmente o
+   calculo da distancia, tornando os demais atributos irrelevantes.
+
+   Exemplo ilustrativo: Suponha um dataset com "Idade" (0 a 100) e
+   "Salario" (1.000 a 100.000). Ao calcular a distancia entre duas
+   pessoas:
+
+     d = SQRT[ (idade_A - idade_B)^2 + (salario_A - salario_B)^2 ]
+
+   A diferenca de salario (que pode ser de milhares) ao quadrado
+   "esmaga" numericamente a diferenca de idade (no maximo dezenas ao
+   quadrado). O algoritmo passaria a decidir a vizinhanca praticamente
+   SO pelo salario. Colocar todos os atributos na mesma escala garante
+   que cada um contribua de forma justa e proporcional.
+
+
+   AS TECNICAS DE NORMALIZACAO:
+
+   (A) NORMALIZACAO MIN-MAX (Reescala para o intervalo [0, 1])
+
+   Transforma os dados para que fiquem contidos entre 0 e 1.
+
+                  x  -  x_min
+     x_norm = ---------------------
+                x_max  -  x_min
+
+   Onde x_min e x_max sao os valores minimo e maximo daquele atributo.
+
+
+   (B) PADRONIZACAO Z-SCORE (Standardization)
+
+   Transforma os dados para que tenham media (mu) igual a 0 e desvio
+   padrao (sigma) igual a 1. E menos sensivel a outliers extremos.
+
+                  x  -  mu
+     x_norm = ---------------
+                   sigma
+
+   Onde:
+     - mu    = media do atributo;
+     - sigma = desvio padrao do atributo.
+
+   OBSERVACAO METODOLOGICA IMPORTANTE: Os parametros da normalizacao
+   (min, max, mu, sigma) devem ser calculados APENAS sobre o conjunto de
+   TREINO e depois aplicados ao conjunto de TESTE. Calcular sobre o
+   dataset inteiro causa "vazamento de dados" (data leakage), inflando
+   artificialmente a metrica de desempenho.
+
+
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECAO 4 - REFERENCIAS BIBLIOGRAFICAS (PADRAO APA)
+--------------------------------------------------------------------------------
+
+Cover, T. M., & Hart, P. E. (1967). Nearest neighbor pattern
+   classification. IEEE Transactions on Information Theory, 13(1),
+   21-27. https://doi.org/10.1109/TIT.1967.1053964
+
+Fix, E., & Hodges, J. L. (1951). Discriminatory analysis:
+   Nonparametric discrimination, consistency properties (Report No.
+   4). USAF School of Aviation Medicine, Randolph Field, Texas.
+
+Fisher, R. A. (1936). The use of multiple measurements in taxonomic
+   problems. Annals of Eugenics, 7(2), 179-188.
+   https://doi.org/10.1111/j.1469-1809.1936.tb02137.x
+
+Mitchell, T. M. (1997). Machine Learning. New York: McGraw-Hill.
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2013). An
+   Introduction to Statistical Learning: with Applications in R. New
+   York: Springer. https://doi.org/10.1007/978-1-4614-7138-7
+
+Hastie, T., Tibshirani, R., & Friedman, J. (2009). The Elements of
+   Statistical Learning: Data Mining, Inference, and Prediction (2nd
+   ed.). New York: Springer.
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B.,
+   Grisel, O., ... & Duchesnay, E. (2011). Scikit-learn: Machine
+   learning in Python. Journal of Machine Learning Research, 12,
+   2825-2830.
+
+
+================================================================================
+                             FIM DO RELATORIO
+================================================================================
